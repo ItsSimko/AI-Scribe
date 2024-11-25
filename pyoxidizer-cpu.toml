@@ -1,0 +1,45 @@
+# pyoxidizer.toml
+
+# Configurations for building FreeScribe Client
+[package]
+name = "freescribe-client-cpu"
+version = "0.1.0"
+authors = ["ClinicianFOCUS"]
+
+# Define the Python interpreter and application entry point
+[build]
+target = "x86_64-pc-windows-msvc"
+profile = "release"
+
+[python]
+app_name = "freescribe-client-cpu"
+default_entry_point = "src.FreeScribe.client.client"
+
+# Configure the binary output
+[dist]
+output_exe = "freescribe-client-cpu.exe"
+
+# Embed application-specific resources
+[[files]]
+source = "src/FreeScribe.client/whisper-assets"
+destination = "whisper/assets"
+
+[[files]]
+source = "src/FreeScribe.client/markdown"
+destination = "markdown"
+
+[[files]]
+source = "src/FreeScribe.client/assets"
+destination = "assets"
+
+# Include an icon for the executable
+[dist.windows]
+icon_path = "src/FreeScribe.client/assets/logo.ico"
+
+# Add hooks directory if necessary
+[python.import_options]
+additional_import_paths = ["scripts/hooks"]
+
+# Specify the type of executable
+[python.windows_exe_options]
+console = false
