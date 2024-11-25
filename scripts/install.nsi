@@ -2,7 +2,7 @@
 !include "LogicLib.nsh"
 
 ; Define the name of the installer
-OutFile "..\dist\FreeScribeInstaller.exe"
+OutFile "..\build\FreeScribeInstaller.exe"
 
 ; Define the default installation directory to AppData
 InstallDir "$PROGRAMFILES\FreeScribe"
@@ -158,10 +158,17 @@ Section "MainSection" SEC01
     ; ${EndIf}
 
     ${If} $SELECTED_OPTION == "NVIDIA"
-        ; Add files to the installer
-        File /r "..\dist\freescribe-client-nvidia\freescribe-client-nvidia.exe"
+        ; Add the main executable from PyOxidizer
+        File "..\build\x86_64-pc-windows-msvc\release\install\freescribe-client-nvidia.exe"
         Rename "$INSTDIR\freescribe-client-nvidia.exe" "$INSTDIR\freescribe-client.exe"
-        File /r "..\dist\freescribe-client-nvidia\_internal"
+        
+        ; Add the `_pyo3_data` directory if PyOxidizer generated one (for dynamic libraries or other assets)
+        File /r "..\build\x86_64-pc-windows-msvc\release\install\_pyo3_data"
+        
+        ; Add any additional files or directories that PyOxidizer outputs
+        ; File /r "..\build\x86_64-pc-windows-msvc\release\install\assets"
+        ; File /r "..\build\x86_64-pc-windows-msvc\release\install\whisper"
+        ; File /r "..\build\x86_64-pc-windows-msvc\release\install\markdown"
     ${EndIf}
 
 
