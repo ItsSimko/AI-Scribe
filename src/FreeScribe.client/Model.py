@@ -7,7 +7,7 @@ import tkinter.messagebox as messagebox
 from UI.SettingsConstant import SettingsKeys
 
 
-DEFAULT_CONTEXT_WINDOW_SIZE = 8192
+DEFAULT_CONTEXT_WINDOW_SIZE = 4096
 
 
 class Model:
