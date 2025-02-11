@@ -44,51 +44,94 @@ class MarkdownWindow:
         version = get_application_version()
         
 
+        # Store parent's original mousewheel binding
+        self.parent_mousewheel_binding = parent.bind_all("<MouseWheel>")
+        
         # Create a frame to hold the HTMLLabel and scrollbar
         frame = tk.Frame(self.window)
         frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Create the HTMLLabel widget
-        html_label = HTMLLabel(frame, html=content)
-        html_label.pack(side="left", fill="both", expand=True)
+        self.html_label = HTMLLabel(frame, html=content)
+        self.html_label.pack(side="left", fill="both", expand=True)
 
         # Create the scrollbar
-        scrollbar = tk.Scrollbar(frame, orient="vertical", command=html_label.yview)
-        scrollbar.pack(side="right", fill="y")
+        self.scrollbar = tk.Scrollbar(frame, orient="vertical", command=self.html_label.yview)
+        self.scrollbar.pack(side="right", fill="y")
 
         # Configure the HTMLLabel to use the scrollbar
-        html_label.config(yscrollcommand=scrollbar.set)
+        self.html_label.config(yscrollcommand=self.scrollbar.set)
+
+        # Bind mousewheel only when mouse is over the HTMLLabel
+        self.html_label.bind('<Enter>', self._bind_mousewheel)
+        self.html_label.bind('<Leave>', self._unbind_mousewheel)
 
         # Optional checkbox and callback handling
         if callback:
             var = tk.BooleanVar()
             # Center the checkbox
-            check_button = tk.Checkbutton(footer_frame, text="Don't show this message again", variable=var, bg="lightgray").grid(row=0, column=1, padx=5, pady=3)
+            check_button = tk.Checkbutton(footer_frame, text="Don't show this message again", 
+                                        variable=var, bg="lightgray")
+            check_button.grid(row=0, column=1, padx=5, pady=3)
+            
             # Center the close button
-            close_button = tk.Button(footer_frame, text="Close", command=lambda: self._on_close(var, callback), width=6).grid(row=1, column=1, padx=5, pady=3)
-            # version_label with sunken relief, smaller and right-aligned within footer_frame
-            version_label = tk.Label(footer_frame, text=f"Version: {get_application_version()}", pady=2, padx=5, relief="sunken", font=("Arial", 8)).grid(row=1, column=2, sticky='se')
+            close_button = tk.Button(footer_frame, text="Close", 
+                                   command=lambda: self._on_close(var, callback), width=6)
+            close_button.grid(row=1, column=1, padx=5, pady=3)
+            
+            # version_label with sunken relief, smaller and right-aligned
+            version_label = tk.Label(footer_frame, text=f"Version: {version}", 
+                                   pady=2, padx=5, relief="sunken", font=("Arial", 8))
+            version_label.grid(row=1, column=2, sticky='se')
+            
             # Adjust column weights to center elements
             footer_frame.grid_columnconfigure(0, weight=1)
             footer_frame.grid_columnconfigure(1, weight=1)
             footer_frame.grid_columnconfigure(2, weight=0)
         else:
             # Center the close button
-            close_button = tk.Button(footer_frame, text="Close", command=self.window.destroy, width=6).grid(row=0, column=1, columnspan=2, padx=5, pady=3)
+            close_button = tk.Button(footer_frame, text="Close", 
+                                   command=self._on_window_close, width=6)
+            close_button.grid(row=0, column=1, columnspan=2, padx=5, pady=3)
+            
             # Place the version label in the bottom right corner
-            version_label = tk.Label(footer_frame, text=f"Version: {get_application_version()}", pady=2, padx=5, relief="sunken", font=("Arial", 8)).grid(row=0, column=3, sticky='e')
-            # Adjust column weights to center the close button and anchor the version label to the right
+            version_label = tk.Label(footer_frame, text=f"Version: {version}", 
+                                   pady=2, padx=5, relief="sunken", font=("Arial", 8))
+            version_label.grid(row=0, column=3, sticky='e')
+            
+            # Adjust column weights
             footer_frame.grid_columnconfigure(0, weight=1)
             footer_frame.grid_columnconfigure(1, weight=1)
             footer_frame.grid_columnconfigure(2, weight=1)
-            footer_frame.grid_columnconfigure(3, weight=0)  
+            footer_frame.grid_columnconfigure(3, weight=0)
 
-        # Adjust window size based on content with constraints
-        self._adjust_window_size(html_label, scrollbar)
+        # Adjust window size and position
+        self._adjust_window_size(self.html_label, self.scrollbar)
         self._display_to_center()
         self.window.lift()
-    
+
+        # Bind the window close event
+        self.window.protocol("WM_DELETE_WINDOW", self._on_window_close)
+
+    def _bind_mousewheel(self, event):
+        """Bind mousewheel to HTMLLabel and temporarily unbind parent's mousewheel"""
+        if self.parent_mousewheel_binding:
+            self.parent.unbind_all("<MouseWheel>")
+        self.window.bind_all("<MouseWheel>", self._on_mousewheel)
+        
+    def _unbind_mousewheel(self, event):
+        """Unbind mousewheel from HTMLLabel and restore parent's mousewheel binding"""
+        self.window.unbind_all("<MouseWheel>")
+        if self.parent_mousewheel_binding:
+            self.parent.bind_all("<MouseWheel>", self.parent_mousewheel_binding)
+
+    def _on_mousewheel(self, event):
+        """Handle mousewheel scrolling"""
+        self.html_label.yview_scroll(int(-1 * (event.delta/120)), "units")
+        return "break"
+
     def _display_to_center(self):
+        """Center the window on the screen"""
         # Get parent window dimensions and position
         parent_x = self.parent.winfo_x()
         parent_y = self.parent.winfo_y()
@@ -126,7 +169,7 @@ class MarkdownWindow:
 
     def _on_close(self, var, callback):
         """
-        Handles the window close event.
+        Handles the window close event with callback.
 
         Parameters:
         -----------
@@ -136,4 +179,11 @@ class MarkdownWindow:
             The callback function to be called with the state of the checkbox.
         """
         callback(var.get())
+        self._on_window_close()
+
+    def _on_window_close(self):
+        """Clean up bindings and restore parent's mousewheel binding before closing"""
+        self.window.unbind_all("<MouseWheel>")
+        if self.parent_mousewheel_binding:
+            self.parent.bind_all("<MouseWheel>", self.parent_mousewheel_binding)
         self.window.destroy()

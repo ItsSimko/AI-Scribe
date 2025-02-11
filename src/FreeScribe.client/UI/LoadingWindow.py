@@ -17,6 +17,8 @@ class LoadingWindow:
     :type initial_text: str
     :param on_cancel: Callback function to execute when cancel is pressed
     :type on_cancel: callable or None
+    :param note_text: Optional note text to display below the initial text
+    :type note_text: str or None
     
     :ivar popup: The main popup window
     :type popup: tk.Toplevel
@@ -28,16 +30,14 @@ class LoadingWindow:
     Example
     -------
     >>> root = tk.Tk()
-    >>> def cancel_callback():
-    ...     print("Operation cancelled")
-    >>> processing = LoadingWindow(root, on_cancel=cancel_callback)
+    >>> processing = LoadingWindow(root, title="Processing", initial_text="Loading", note_text="Note: This may take some time.")
     >>> # Do some work here
     >>> if not processing.cancelled:
     ...     # Complete the operation
     >>> processing.destroy()
     """
 
-    def __init__(self, parent=None, title="Processing", initial_text="Loading", on_cancel=None):
+    def __init__(self, parent=None, title="Processing", initial_text="Loading", on_cancel=None, note_text=None):
         """
         Initialize the processing popup window.
         
@@ -49,18 +49,24 @@ class LoadingWindow:
         :type initial_text: str
         :param on_cancel: Callback function to execute when cancel is pressed
         :type on_cancel: callable or None
+        :param note_text: Optional note text to display below the initial text
+        :type note_text: str or None
         """
         try:
             self.title = title
             self.initial_text = initial_text
+            self.note_text = note_text
             self.parent = parent
             self.on_cancel = on_cancel
             self.cancelled = False
             
             self.popup = tk.Toplevel(parent)
             self.popup.title(title)
-            # increased width for whisper model type
-            self.popup.geometry("280x105")  # Increased height for cancel button
+            # Adjust geometry based on whether note_text is provided
+            if note_text:
+                self.popup.geometry("360x180")  # Increased height for note text
+            else:
+                self.popup.geometry("280x105")  # Default height
             self.popup.iconbitmap(get_file_path('assets','logo.ico'))
 
             if parent:
@@ -81,9 +87,14 @@ class LoadingWindow:
             self.progress.pack(padx=20, pady=(0,10), fill='x')
             self.progress.start()
 
+            # Add note text if provided
+            if note_text:
+                self.note_label = tk.Label(self.popup, text=note_text, wraplength=350, justify='center', font=("TkDefaultFont",9),fg="#262525")
+                self.note_label.pack(pady=(0,10))
+
             # Add cancel button
             self.cancel_button = ttk.Button(self.popup, text="Cancel", command=self._handle_cancel)
-            self.cancel_button.pack(pady=(4,0))
+            self.cancel_button.pack(pady=(7,5))
 
             # Not Resizable
             self.popup.resizable(False, False)

@@ -179,6 +179,7 @@ RATE = 16000
 # Application flags
 is_audio_processing_realtime_canceled = threading.Event()
 is_audio_processing_whole_canceled = threading.Event()
+cancel_await_thread = threading.Event()
 
 # Constants
 DEFAULT_BUTTON_COLOUR = "SystemButtonFace"
@@ -620,7 +621,7 @@ def toggle_recording():
             mic_button.config(bg="red", text="Stop\nRecording")
         elif current_view == "minimal":
             mic_button.config(bg="red", text="⏹️")
-        
+
         start_flashing()
     else:
         enable_recording_ui_elements()
@@ -682,6 +683,7 @@ def toggle_recording():
         save_audio()
 
         print("*** Recording Stopped")
+        stop_flashing()
 
         if current_view == "full":
             mic_button.config(bg=DEFAULT_BUTTON_COLOUR, text="Start\nRecording")
@@ -841,6 +843,7 @@ def send_audio_to_server():
         finally:
             GENERATION_THREAD_ID = None
             clear_application_press()
+            stop_flashing()
 
     loading_window = LoadingWindow(root, "Processing Audio", "Processing Audio. Please wait.", on_cancel=lambda: (cancel_processing(), cancel_whole_audio_process(current_thread_id)))
 
@@ -970,6 +973,7 @@ def send_audio_to_server():
                 if os.path.exists(file_to_send) and delete_file:
                     os.remove(file_to_send)
                 loading_window.destroy()
+    stop_flashing()
 
 def kill_thread(thread_id):
     """
@@ -1010,7 +1014,6 @@ def send_and_receive():
     display_text(NOTE_CREATION)
     threaded_handle_message(user_message)
 
-        
 
 def display_text(text):
     response_display.scrolled_text.configure(state='normal')
@@ -1337,7 +1340,7 @@ def show_edit_transcription_popup(formatted_message):
     if (app_settings.editable_settings[SettingsKeys.LOCAL_LLM.value] or is_private_ip(app_settings.editable_settings[SettingsKeys.LLM_ENDPOINT.value])) and not app_settings.editable_settings["Show Scrub PHI"]:
         generate_note_thread(cleaned_message)
         return
-    
+
     popup = tk.Toplevel(root)
     popup.title("Scrub PHI Prior to GPT")
     popup.iconbitmap(get_file_path('assets','logo.ico'))
@@ -1354,10 +1357,13 @@ def show_edit_transcription_popup(formatted_message):
     proceed_button = tk.Button(popup, text="Proceed", command=on_proceed)
     proceed_button.pack(side=tk.RIGHT, padx=10, pady=10)
 
-    # Cancel button
-    cancel_button = tk.Button(popup, text="Cancel", command=popup.destroy)
-    cancel_button.pack(side=tk.LEFT, padx=10, pady=10)
+    def on_cancel():
+        popup.destroy()
+        stop_flashing()
 
+    # Cancel button
+    cancel_button = tk.Button(popup, text="Cancel", command=on_cancel)
+    cancel_button.pack(side=tk.LEFT, padx=10, pady=10)
 
 
 def generate_note_thread(text: str):
@@ -1391,6 +1397,7 @@ def generate_note_thread(text: str):
             print(f"An error occurred: {e}")
         finally:
             GENERATION_THREAD_ID = None
+            stop_flashing()
 
     # Track the screen input thread
     screen_thread = None
@@ -1419,6 +1426,7 @@ def generate_note_thread(text: str):
             root.after(500, lambda: check_thread_status(thread, loading_window))
         else:
             loading_window.destroy()
+            stop_flashing()
 
     root.after(500, lambda: check_thread_status(thread, loading_window))
 
@@ -1431,16 +1439,17 @@ def upload_file():
     start_flashing()
 
 
-
 def start_flashing():
     global is_flashing
     is_flashing = True
     flash_circle()
 
+
 def stop_flashing():
     global is_flashing
     is_flashing = False
     blinking_circle_canvas.itemconfig(circle, fill='white')  # Reset to default color
+
 
 def flash_circle():
     if is_flashing:
@@ -1449,9 +1458,11 @@ def flash_circle():
         blinking_circle_canvas.itemconfig(circle, fill=new_color)
         root.after(1000, flash_circle)  # Adjust the flashing speed as needed
 
+
 def send_and_flash():
     start_flashing()
     send_and_receive()
+
 
 # Initialize variables to store window geometry for switching between views
 last_full_position = None
@@ -1504,8 +1515,8 @@ def set_full_view():
     history_frame.grid()
     mic_button.grid(row=1, column=1, pady=5, padx=0,sticky='nsew')
     pause_button.grid(row=1, column=2, pady=5, padx=0,sticky='nsew')
-    switch_view_button.grid(row=1, column=7, pady=5, padx=0,sticky='nsew')
-    blinking_circle_canvas.grid(row=1, column=8, padx=0,pady=5)
+    switch_view_button.grid(row=1, column=6, pady=5, padx=0,sticky='nsew')
+    blinking_circle_canvas.grid(row=1, column=7, padx=0,pady=5)
     footer_frame.grid()
 
     window.toggle_menu_bar(enable=True)
@@ -1689,8 +1700,13 @@ def _load_stt_model_thread():
     with stt_model_loading_thread_lock:
         global stt_local_model
 
+        def on_cancel_whisper_load():
+            cancel_await_thread.set()
+
         model_name = app_settings.editable_settings[SettingsKeys.WHISPER_MODEL.value].strip()
-        stt_loading_window = LoadingWindow(root, "Speech to Text", f"Loading Speech to Text {model_name} model. Please wait.")
+        stt_loading_window = LoadingWindow(root, title="Speech to Text", initial_text="Loading Speech to Text medium model. Please wait.", 
+                            note_text="Note: If this is the first time loading the model, it will be actively downloading and may take some time.\n We appreciate your patience!",on_cancel=on_cancel_whisper_load)
+        window.disable_settings_menu()
         print(f"Loading STT model: {model_name}")
 
         try:
@@ -1717,6 +1733,7 @@ def _load_stt_model_thread():
             stt_local_model = None
             messagebox.showerror("Error", f"An error occurred while loading Speech to Text {type(e).__name__}: {e}")
         finally:
+            window.enable_settings_menu()
             stt_loading_window.destroy()
             print("Closing STT loading window.")
 
@@ -1953,12 +1970,56 @@ if (app_settings.editable_settings['Show Welcome Message']):
 
 #Wait for the UI root to be intialized then load the model. If using local llm.
 if app_settings.editable_settings[SettingsKeys.LOCAL_LLM.value]:
-    root.after(100, lambda:(ModelManager.setup_model(app_settings=app_settings, root=root)))  
+    def on_cancel_llm_load():
+        cancel_await_thread.set()
+    root.after(100, lambda:(ModelManager.setup_model(app_settings=app_settings, root=root, on_cancel=on_cancel_llm_load)))
 
 if app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value]:
     # Inform the user that Local Whisper is being used for transcription
     print("Using Local Whisper for transcription.")
     root.after(100, lambda: (load_stt_model()))
+
+# wait for both whisper and llm to be loaded before unlocking the settings button
+def await_models(timeout_length=60):
+    """
+    Waits until the necessary models (Whisper and LLM) are fully loaded.
+
+    The function checks if local models are enabled based on application settings. 
+    If a remote model is used, the corresponding flag is set to True immediately, 
+    bypassing the wait. Otherwise, the function enters a loop that periodically 
+    checks for model readiness and prints status updates until both models are loaded.
+
+    :return: None
+    """
+    #if we cancel this thread then break out of the loop
+    if cancel_await_thread.is_set():
+        print("*** Model loading cancelled. Enabling settings bar.")
+        #reset the flag
+        cancel_await_thread.clear()
+        #reset the settings bar
+        window.enable_settings_menu()
+        #return so the .after() doesnt get called.
+        return
+
+    # if we are using remote whisper then we can assume it is loaded and dont wait
+    whisper_loaded = (not app_settings.editable_settings[SettingsKeys.LOCAL_WHISPER.value] or stt_local_model)
+    
+    # if we are not using local llm then we can assume it is loaded and dont wait
+    llm_loaded = (not app_settings.editable_settings[SettingsKeys.LOCAL_LLM.value] or ModelManager.local_model)
+ 
+    # wait for both models to be loaded
+    if not whisper_loaded or not llm_loaded:
+        print("Waiting for models to load...")
+
+        # override the lock in case something else tried to edit
+        window.disable_settings_menu()
+
+        root.after(100, await_models)
+    else:
+        print("*** Models loaded successfully on startup.")
+        window.enable_settings_menu()
+
+root.after(100, await_models)
 
 root.bind("<<LoadSttModel>>", load_stt_model)
 

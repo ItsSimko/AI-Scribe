@@ -182,6 +182,13 @@ class MicrophoneTestFrame:
         """
         Handle the event when the dropdown is clicked.
         """
+        # Check if the dropdown is disabled
+        if 'disabled' in self.mic_dropdown.state():
+            return  # Ignore the click if disabled
+
+        # Get the current selected microphone name
+        current_selected_name = self.mic_dropdown.get()
+
         # Reinitialize PyAudio
         if self.p:
             self.p.terminate()
@@ -194,16 +201,19 @@ class MicrophoneTestFrame:
         mic_options = [f"{name}" for _, name in self.mic_list]
         self.mic_dropdown['values'] = mic_options
 
-        # If the selected microphone is no longer available, select the first one
-        if MicrophoneState.SELECTED_MICROPHONE_NAME not in [name for _, name in self.mic_list]:
-            if self.mic_list:
-                self.update_selected_microphone(self.mic_list[0][0])
-                self.mic_dropdown.set(self.mic_list[0][1])
-            else:
-                self.status_label.config(text="Error: No microphones available", foreground="red")
-                MicrophoneState.SELECTED_MICROPHONE_INDEX = None
-                MicrophoneState.SELECTED_MICROPHONE_NAME = None
-
+        # Check if the selected microphone is still available
+        if current_selected_name in [name for _, name in self.mic_list]:
+            self.mic_dropdown.set(current_selected_name)
+            # Reopen the stream with the current selected microphone
+            self.reopen_stream()
+        elif self.mic_list:
+            # If the selected microphone is no longer available, select the first one
+            self.update_selected_microphone(self.mic_list[0][0])
+            self.mic_dropdown.set(self.mic_list[0][1])
+        else:
+            self.status_label.config(text="Error: No microphones available", foreground="red")
+            MicrophoneState.SELECTED_MICROPHONE_INDEX = None
+            MicrophoneState.SELECTED_MICROPHONE_NAME = None
     def update_selected_microphone(self, selected_index):
         """
         Update the selected microphone index and name.
@@ -295,16 +305,19 @@ class MicrophoneTestFrame:
             if np.isnan(rms) or rms <= 0:
                 volume = 0
             else:
-                scaling_factor = 500
+                # Adjust the scaling factor to make the meter more sensitive
+                scaling_factor = 1000
                 volume = min(max(int((rms / 32768) * scaling_factor), 0), 100)
 
             # Update segments
             active_segments = int((volume / 100) * self.SEGMENT_COUNT)
             for i, segment in enumerate(self.segments):
                 if i < active_segments:
-                    if i < self.SEGMENT_COUNT * 0.6:
+                    # Adjusted threshold for green
+                    if i < self.SEGMENT_COUNT * 0.4:  
                         segment.configure(style='Green.TFrame')
-                    elif i < self.SEGMENT_COUNT * 0.8:
+                        # Adjusted threshold for yellow
+                    elif i < self.SEGMENT_COUNT * 0.7:
                         segment.configure(style='Yellow.TFrame')
                     else:
                         segment.configure(style='Red.TFrame')

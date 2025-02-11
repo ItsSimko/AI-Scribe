@@ -792,6 +792,46 @@ class SettingsWindowUI:
         # Focus on the root window again incase lost
         self.root.focus_force()
 
+    def add_scrollbar_to_frame(self, frame):
+        """
+        Adds a scrollbar to a given frame.
+
+        Args:
+            frame (tk.Frame): The frame to which the scrollbar will be added.
+
+        Returns:
+            tk.Frame: The scrollable frame.
+        """
+        # Guard clause: return frame as is if it's not the advanced frame
+        if frame != self.advanced_frame:
+            return frame
+
+        # Create scrollable frame components
+        canvas = tk.Canvas(frame)
+        scrollbar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
+        scrollable_frame = ttk.Frame(canvas)
+
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        def _on_mousewheel(event):
+            if canvas.winfo_exists():  # Check if canvas still exists
+                canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                return "break"
+
+        # Bind mousewheel only when mouse is over the canvas
+        canvas.bind('<Enter>', lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind('<Leave>', lambda e: canvas.unbind_all("<MouseWheel>"))
+
+        return scrollable_frame      
     def close_window(self):
         """
         Cleans up the settings window.

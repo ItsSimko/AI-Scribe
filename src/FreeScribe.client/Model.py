@@ -7,7 +7,7 @@ import tkinter.messagebox as messagebox
 from UI.SettingsConstant import SettingsKeys
 
 
-DEFAULT_CONTEXT_WINDOW_SIZE = 8192
+DEFAULT_CONTEXT_WINDOW_SIZE = 4096
 
 
 class Model:
@@ -165,7 +165,7 @@ class ModelManager:
     local_model = None
 
     @staticmethod
-    def setup_model(app_settings, root):
+    def setup_model(app_settings, root, on_cancel: callable = None):
         """
         Initialize and load the LLM model based on application settings.
 
@@ -184,7 +184,16 @@ class ModelManager:
             The method uses threading to avoid blocking the UI while loading the model.
             GPU layers are set to -1 for CUDA architecture and 0 for CPU.
         """
-        loading_window = LoadingWindow(root, "Loading Model", "Loading Model. Please wait")
+
+        def on_cancel_load():
+            """
+            Cancel the model loading process and cleanup resources.
+            """
+            if on_cancel is not None:
+                on_cancel()
+
+        loading_window = LoadingWindow(root, "Loading Model", "Loading Model. Please wait", on_cancel=on_cancel_load)
+        app_settings.main_window.disable_settings_menu()
 
         # unload before loading new model
         if ModelManager.local_model is not None:
@@ -234,6 +243,7 @@ class ModelManager:
             if thread.is_alive():
                 root.after(500, lambda: check_thread_status(thread, loading_window, root))
             else:
+                app_settings.main_window.enable_settings_menu()
                 loading_window.destroy()
 
         root.after(500, lambda: check_thread_status(thread, loading_window, root))
