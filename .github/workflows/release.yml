@@ -8,10 +8,10 @@ on:
       - "v*.*.*-RC*"
 
 jobs:
-  build-windows:
+  build-nvidia:
     runs-on: windows-latest
-    permissions:
-      contents: write
+    outputs:
+      is_alpha: ${{ steps.check_alpha.outputs.is_alpha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v1
@@ -21,6 +21,16 @@ jobs:
           $tag = '${{ github.ref }}' -replace 'refs/tags/', ''
           echo $tag > .\scripts\__version__
         shell: pwsh
+      
+      - name: Check if alpha or RC release
+        id: check_alpha
+        run: |
+          if ("${{ github.ref }}" -like "*.alpha" -or "${{ github.ref }}" -like "*-RC*") {
+            echo "is_alpha=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "is_alpha=false" >> $env:GITHUB_OUTPUT
+          }
+        shell: pwsh
 
       - name: Install Python
         uses: actions/setup-python@v1
@@ -28,12 +38,11 @@ jobs:
           python-version: "3.10"
           architecture: "x64"
 
-      # Create CUDA-enabled executable
       - name: Install CUDA-enabled llama_cpp
         run: |
           pip install --index-url https://abetlen.github.io/llama-cpp-python/whl/cu124 --extra-index-url https://pypi.org/simple llama-cpp-python==v0.2.90
 
-      - name: Instal CUDA drivers for NVIDIA install
+      - name: Install CUDA drivers for NVIDIA install
         run: |
           pip install nvidia-cudnn-cu12==9.5.0.50
           pip install nvidia-cuda-runtime-cu12==12.4.127
@@ -48,26 +57,24 @@ jobs:
         run: |
           pyinstaller --additional-hooks-dir=.\scripts\hooks --add-data ".\scripts\NVIDIA_INSTALL.txt:install_state" --add-data ".\src\FreeScribe.client\whisper-assets:faster_whisper\assets" --add-data ".\src\FreeScribe.client\markdown:markdown" --add-data ".\src\FreeScribe.client\assets:assets" --add-data "C:\hostedtoolcache\windows\Python\3.10.11\x64\lib\site-packages\nvidia:nvidia-drivers" --name freescribe-client-nvidia --icon=.\src\FreeScribe.client\assets\logo.ico .\src\FreeScribe.client\client.py
 
-      # Create CPU-only executable
-      - name: Uninstall CUDA-enabled llama_cpp (if necessary) and install CPU-only llama_cpp
-        run: |
-          pip uninstall nvidia-cudnn-cu12==9.5.0.50
-          pip uninstall nvidia-cuda-runtime-cu12==12.4.127
-          pip uninstall nvidia-cuda-nvrtc-cu12==12.4.127
-          pip uninstall nvidia-cublas-cu12==12.4.5.8
-          pip uninstall -y llama-cpp-python
-          pip install --index-url https://abetlen.github.io/llama-cpp-python/whl/cpu --extra-index-url https://pypi.org/simple llama-cpp-python==v0.2.90
-
-      - name: Run PyInstaller for CPU-only
-        run: |
-          pyinstaller --additional-hooks-dir=.\scripts\hooks --add-data ".\scripts\CPU_INSTALL.txt:install_state" --add-data ".\src\FreeScribe.client\whisper-assets:faster_whisper\assets" --add-data ".\src\FreeScribe.client\markdown:markdown" --add-data ".\src\FreeScribe.client\assets:assets" --name freescribe-client-cpu --icon=.\src\FreeScribe.client\assets\logo.ico .\src\FreeScribe.client\client.py
-
-      - name: Set up NSIS
-        uses: joncloud/makensis-action@1c9f4bf2ea0c771147db31a2f3a7f5d8705c0105
+      - name: Upload NVIDIA build artifact
+        uses: actions/upload-artifact@v3
         with:
-          script-file: .\scripts\install.nsi
-          additional-plugin-paths: "./scripts/nsis-plugins"
+          name: nvidia-build
+          path: dist/freescribe-client-nvidia
 
+  build-cpu:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Create Version Text File for PyInstaller
+        run: |
+          $tag = '${{ github.ref }}' -replace 'refs/tags/', ''
+          echo $tag > .\scripts\__version__
+        shell: pwsh
+      
       - name: Check if alpha or RC release
         id: check_alpha
         run: |
@@ -77,6 +84,57 @@ jobs:
             echo "is_alpha=false" >> $env:GITHUB_OUTPUT
           }
         shell: pwsh
+        
+      - name: Install Python
+        uses: actions/setup-python@v1
+        with:
+          python-version: "3.10"
+          architecture: "x64"
+
+      - name: Install CPU-only llama_cpp
+        run: |
+          pip install --index-url https://abetlen.github.io/llama-cpp-python/whl/cpu --extra-index-url https://pypi.org/simple llama-cpp-python==v0.2.90
+
+      - name: Install requirements
+        run: |
+          pip install -r client_requirements.txt
+
+      - name: Run PyInstaller for CPU-only
+        run: |
+          pyinstaller --additional-hooks-dir=.\scripts\hooks --add-data ".\scripts\CPU_INSTALL.txt:install_state" --add-data ".\src\FreeScribe.client\whisper-assets:faster_whisper\assets" --add-data ".\src\FreeScribe.client\markdown:markdown" --add-data ".\src\FreeScribe.client\assets:assets" --name freescribe-client-cpu --icon=.\src\FreeScribe.client\assets\logo.ico .\src\FreeScribe.client\client.py
+
+      - name: Upload CPU build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: cpu-build
+          path: dist/freescribe-client-cpu
+
+  build-installer:
+    needs: [build-nvidia, build-cpu]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+
+      - name: Download NVIDIA build
+        uses: actions/download-artifact@v3
+        with:
+          name: nvidia-build
+          path: dist/freescribe-client-nvidia
+
+      - name: Download CPU build
+        uses: actions/download-artifact@v3
+        with:
+          name: cpu-build
+          path: dist/freescribe-client-cpu
+
+      - name: Set up NSIS
+        uses: joncloud/makensis-action@1c9f4bf2ea0c771147db31a2f3a7f5d8705c0105
+        with:
+          script-file: .\scripts\install.nsi
+          additional-plugin-paths: "./scripts/nsis-plugins"
 
       - name: Create release
         id: create_release
@@ -92,7 +150,7 @@ jobs:
 
             For full changelog, see [the commits since last release](${{ github.server_url }}/${{ github.repository }}/compare/${{ steps.changelog.last_tag }}...${{ github.ref }})
           draft: false
-          prerelease: ${{ steps.check_alpha.outputs.is_alpha == 'true' }}
+          prerelease: ${{ needs.build-nvidia.outputs.is_alpha == 'true' }}
 
       - name: Upload Installer
         id: upload-installer
