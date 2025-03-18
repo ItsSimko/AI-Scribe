@@ -63,15 +63,15 @@ from Model import ModelStatus
 from services.whisper_hallucination_cleaner import hallucination_cleaner
 
 
-if os.environ.get("FREESCRIBE_DEBUG"):
-    LOG_LEVEL = logging.DEBUG
-else:
-    LOG_LEVEL = logging.INFO
+LOG_LEVEL = logging.DEBUG
+
 
 logging.basicConfig(
     level=LOG_LEVEL,
     format='%(asctime)s - %(threadName)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()]
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler(get_resource_path("freescribe.log"))]
 )
 
 logger = logging.getLogger(__name__)

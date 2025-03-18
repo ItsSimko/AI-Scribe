@@ -23,4 +23,6 @@ freescribe-client-nvidia.spec
 scripts/FreeScribeInstaller.exe
 
 _build
+
 .cpu
+freescribe.log
