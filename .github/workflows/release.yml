@@ -165,10 +165,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-macos-intel, build-macos-arm]
     steps:
-      - name: Download Windows Installer
-        uses: actions/download-artifact@v4
-        with:
-          name: FreeScribeInstaller_windows.exe
+      # - name: Download Windows Installer
+      #   uses: actions/download-artifact@v4
+      #   with:
+      #     name: FreeScribeInstaller_windows.exe
 
       - name: Download Intel Installer
         uses: actions/download-artifact@v4
