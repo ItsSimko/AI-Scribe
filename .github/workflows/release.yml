@@ -58,7 +58,7 @@ jobs:
           pyinstaller --additional-hooks-dir=.\scripts\hooks --add-data ".\scripts\NVIDIA_INSTALL.txt:install_state" --add-data ".\src\FreeScribe.client\whisper-assets:faster_whisper\assets" --add-data ".\src\FreeScribe.client\markdown:markdown" --add-data ".\src\FreeScribe.client\assets:assets" --add-data "C:\hostedtoolcache\windows\Python\3.10.11\x64\lib\site-packages\nvidia:nvidia-drivers" --name freescribe-client-nvidia --icon=.\src\FreeScribe.client\assets\logo.ico .\src\FreeScribe.client\client.py
 
       - name: Upload NVIDIA build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: nvidia-build
           path: dist/freescribe-client-nvidia
@@ -84,7 +84,7 @@ jobs:
             echo "is_alpha=false" >> $env:GITHUB_OUTPUT
           }
         shell: pwsh
-        
+
       - name: Install Python
         uses: actions/setup-python@v1
         with:
@@ -104,7 +104,7 @@ jobs:
           pyinstaller --additional-hooks-dir=.\scripts\hooks --add-data ".\scripts\CPU_INSTALL.txt:install_state" --add-data ".\src\FreeScribe.client\whisper-assets:faster_whisper\assets" --add-data ".\src\FreeScribe.client\markdown:markdown" --add-data ".\src\FreeScribe.client\assets:assets" --name freescribe-client-cpu --icon=.\src\FreeScribe.client\assets\logo.ico .\src\FreeScribe.client\client.py
 
       - name: Upload CPU build artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
         with:
           name: cpu-build
           path: dist/freescribe-client-cpu
