@@ -195,21 +195,16 @@ jobs:
         with:
           python-version: "3.10"
           cache: "pip"
-          cache-dependency-path: "**/client_requirements.txt"
+          cache-dependency-path: "**/flatpak/requirements_cpu.txt"
 
-      - name: Install requirements
+      - name: Install requirements for Flatpak
         run: |
-          pip install -r client_requirements.txt
+          pip install -r flatpak/requirements_cpu.txt --target flatpak/python-dependencies
 
       - name: Install additional dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg libportaudio2 flatpak flatpak-builder
-
-      - name: Build Linux executable
-        run: |
-          chmod +x ./build-linux.sh
-          ./build-linux.sh
 
       - name: Build Flatpak
         run: |
@@ -219,18 +214,6 @@ jobs:
       - name: Rename Executable
         run: |
           mv dist/FreeScribe/FreeScribe dist/FreeScribeInstaller_linux
-
-      - name: Upload Linux Executable
-        uses: actions/upload-artifact@v4
-        with:
-          name: FreeScribeInstaller_linux
-          path: dist/FreeScribeInstaller_linux
-
-      - name: Upload Flatpak Bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: FreeScribeInstaller_flatpak
-          path: flatpak/freescribe.
 
       - name: Upload Flatpak Bundle
         uses: softprops/action-gh-release@v2
