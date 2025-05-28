@@ -201,10 +201,10 @@ jobs:
         run: |
           pip install -r flatpak/requirements_cpu.txt --target flatpak/python-dependencies
 
-      - name: Install additional dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libportaudio2 flatpak flatpak-builder
+          sudo apt-get install -y ffmpeg libportaudio2 libportaudio-dev portaudio19-dev flatpak flatpak-builder
 
       - name: Build Flatpak
         run: |
