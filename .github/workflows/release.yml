@@ -197,14 +197,12 @@ jobs:
           cache: "pip"
           cache-dependency-path: "**/flatpak/requirements_cpu.txt"
 
-      # - name: Install requirements for Flatpak
-      #   run: |
-      #     pip install -r flatpak/requirements_cpu.txt --target flatpak/python-dependencies
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libportaudio2 libportaudio-dev portaudio19-dev python3-pyaudio build-essential libasound2-dev flatpak flatpak-builder
+          sudo apt-get install -y ffmpeg flatpak flatpak-builder
+
+      
 
       - name: Build Flatpak
         run: |
