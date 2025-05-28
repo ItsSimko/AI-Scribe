@@ -197,9 +197,9 @@ jobs:
           cache: "pip"
           cache-dependency-path: "**/flatpak/requirements_cpu.txt"
 
-      - name: Install requirements for Flatpak
-        run: |
-          pip install -r flatpak/requirements_cpu.txt --target flatpak/python-dependencies
+      # - name: Install requirements for Flatpak
+      #   run: |
+      #     pip install -r flatpak/requirements_cpu.txt --target flatpak/python-dependencies
 
       - name: Install system dependencies
         run: |
