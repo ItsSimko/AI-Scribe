@@ -204,7 +204,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg libportaudio2 libportaudio-dev portaudio19-dev python3-pyaudio flatpak flatpak-builder
+          sudo apt-get install -y ffmpeg libportaudio2 libportaudio-dev portaudio19-dev python3-pyaudio build-essential libasound2-dev flatpak flatpak-builder
 
       - name: Build Flatpak
         run: |
