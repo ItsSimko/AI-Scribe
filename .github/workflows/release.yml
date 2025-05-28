@@ -27,10 +27,12 @@ jobs:
         shell: pwsh
 
       - name: Install Python
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v5
         with:
           python-version: "3.10"
           architecture: "x64"
+          cache: "pip"
+          cache-dependency-path: "**/client_requirements.txt"
 
       # Create CUDA-enabled executable
       - name: Install CUDA-enabled llama_cpp
@@ -76,11 +78,16 @@ jobs:
         run: |
           mv dist/FreeScribeInstaller.exe dist/FreeScribeInstaller_windows.exe
       
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload Windows Installer
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: FreeScribeInstaller_windows.exe
-          path: dist/FreeScribeInstaller_windows.exe
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: dist/FreeScribeInstaller_windows.exe
+          draft: true
+          prerelease: ${{ github.ref_name }} =~ '.*alpha.*' || ${{ github.ref_name }} =~ '.*-RC.*'
 
   
   build-macos-intel:
@@ -94,7 +101,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.10"
           cache: "pip"
           cache-dependency-path: "**/client_requirements_mac.txt"
 
@@ -118,11 +125,16 @@ jobs:
         run: |
           ./build-pkg.sh --arch x86_64
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload macOS Intel Installer
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: FreeScribeInstaller_x86_64.pkg
-          path: dist/FreeScribeInstaller_x86_64.pkg
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: dist/FreeScribeInstaller_x86_64.pkg
+          draft: true
+          prerelease: ${{ github.ref_name }} =~ '.*alpha.*' || ${{ github.ref_name }} =~ '.*-RC.*'
   
   build-macos-arm:
     runs-on: macos-latest
@@ -135,7 +147,7 @@ jobs:
       - name: Install Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.10"
           cache: "pip"
           cache-dependency-path: "**/client_requirements_mac.txt"
 
@@ -159,68 +171,87 @@ jobs:
         run: |
           ./build-pkg.sh --arch arm64
       
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: FreeScribeInstaller_arm64.pkg
-          path: dist/FreeScribeInstaller_arm64.pkg
-
-  create-release:
-    runs-on: ubuntu-latest
-    needs: [build-windows, build-macos-intel, build-macos-arm]
-    steps:
-      - name: Download Windows Installer
-        uses: actions/download-artifact@v4
-        with:
-          name: FreeScribeInstaller_windows.exe
-
-      - name: Download Intel Installer
-        uses: actions/download-artifact@v4
-        with:
-          name: FreeScribeInstaller_x86_64.pkg
-
-      - name: Download ARM Installer
-        uses: actions/download-artifact@v4
-        with:
-          name: FreeScribeInstaller_arm64.pkg
-
-      - name: Generate Release Name
-        id: generate_release_name
-        run: |
-          $tag = '${{ github.ref }}' -replace 'refs/tags/', ''
-          if ($tag -eq 'dev') { 
-            $date = (Get-Date -Format "yyyyMMdd")
-            $tag = "$tag-nightly-$date"
-          }
-          echo "release_name=$tag" >> $GITHUB_ENV
-        shell: pwsh
-
-      - name: Check if alpha or RC release
-        id: check_alpha
-        run: |
-          if ("${{ github.ref }}" -like "*.alpha" -or "${{ github.ref }}" -like "*-RC*") {
-            echo "is_alpha=true" >> $env:GITHUB_OUTPUT
-          } else {
-            echo "is_alpha=false" >> $env:GITHUB_OUTPUT
-          }
-        shell: pwsh
-
-      - name: Upload Installer
-        id: upload-installer
+      - name: Upload macOS ARM Installer
         uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          name: Release ${{ env.release_name }}
-          tag_name: ${{ github.ref }}
-          body: |
-            ## What's Changed
-            ${{ steps.changelog.outputs.CHANGELOG }}
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: dist/FreeScribeInstaller_arm64.pkg
+          draft: true
+          prerelease: ${{ github.ref_name }} =~ '.*alpha.*' || ${{ github.ref_name }} =~ '.*-RC.*'
 
-            For full changelog, see [the commits since last release](${{ github.server_url }}/${{ github.repository }}/compare/${{ steps.changelog.last_tag }}...${{ github.ref }})
+  build-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+          cache-dependency-path: "**/client_requirements.txt"
+
+      - name: Install requirements
+        run: |
+          pip install -r client_requirements.txt
+
+      - name: Install additional dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg libportaudio2 flatpak flatpak-builder
+
+      - name: Build Linux executable
+        run: |
+          chmod +x ./build-linux.sh
+          ./build-linux.sh
+
+      - name: Build Flatpak
+        run: |
+          chmod +x ./flatpak/build-flatpak.sh
+          ./flatpak/build-flatpak.sh
+
+      - name: Rename Executable
+        run: |
+          mv dist/FreeScribe/FreeScribe dist/FreeScribeInstaller_linux
+
+      - name: Upload Linux Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeScribeInstaller_linux
+          path: dist/FreeScribeInstaller_linux
+
+      - name: Upload Flatpak Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: FreeScribeInstaller_flatpak
+          path: flatpak/freescribe.
+
+      - name: Upload Flatpak Bundle
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: flatpak/freescribe.flatpak
+          draft: true
+          prerelease: ${{ github.ref_name }} =~ '.*alpha.*' || ${{ github.ref_name }} =~ '.*-RC.*'
+          
+  finalize-release:
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos-intel, build-macos-arm, build-linux]
+    steps:
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
           draft: false
-          prerelease: ${{ steps.check_alpha.outputs.is_alpha == 'true' }}
-          files: |
-            FreeScribeInstaller_x86_64.pkg
-            FreeScribeInstaller_arm64.pkg
-            FreeScribeInstaller_windows.exe
