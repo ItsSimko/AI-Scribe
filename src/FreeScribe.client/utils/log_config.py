@@ -5,6 +5,7 @@ import logging
 from collections import deque
 import utils.file_utils
 from utils.AESCryptoUtils import AESCryptoUtilsClass
+import faulthandler
 
 
 MAX_BUFFER_SIZE = 2500
@@ -205,3 +206,5 @@ logger.setLevel(LOG_LEVEL)
 
 sys.stdout = LoggingStream(logging.INFO)
 sys.stderr = LoggingStream(DIAGNOSE_LEVEL)
+
+faulthandler.enable(file=open(utils.file_utils.get_resource_path("freescribe_faulthandler.log"), "a"), all_threads=True)
